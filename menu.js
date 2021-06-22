@@ -4,10 +4,24 @@ var graphics;
 var main_poly;
 
 var random_poly = [];
-var random_poly_size = 40;
+var random_poly_size = 80;
 var timer = 0;
 
-var relaxation_time = 300;
+var radius_brush = 50;
+var brush_active = false;
+
+var posX;
+var posY;
+
+var pointer0;
+
+var relaxation_time = 100;
+
+var hauteur = 1;
+
+var bg;
+var sponge;
+
 
 class menu extends Phaser.Scene{
     
@@ -19,14 +33,17 @@ class menu extends Phaser.Scene{
     
     preload ()
     {
-
+        this.load.image('bg','assets/images/bg.png');
+        this.load.image('sol','assets/images/sol.png');
+        this.load.image('sponge','assets/images/sponge.png');
     }
     
     create ()
     {
-        timer++;
-
         graphics = this.add.graphics();
+        //bg = this.add.sprite(config.width/2,config.height/2,'bg').setScale(config.width,config.height).setInteractive().setTint(0xEA6400);
+        bg = this.add.sprite(config.width/2,config.height/2,'sol').setScale(config.width/378,config.height/237).setInteractive();        
+        sponge = this.add.sprite(config.width/2,config.height/2,'sponge').setScale(1,1).setInteractive().setDepth(10);
 
         //main_poly = [[200,200],[250,250],[300,200],[300,300],[200,300]];
         main_poly = [[100,100],[300,200],[500,100],[400,300],[500,500],[300,400],[100,500],[200,300],];
@@ -39,17 +56,52 @@ class menu extends Phaser.Scene{
             random_poly.push([config.width/2+(50+radius)*Math.cos(theta),config.height/2+(50+radius)*Math.sin(theta)]);
         }       
 
+        bg.on('pointerdown', function (pointer) {
+            brush_active = true;
+            console.log("brush_active",brush_active);
+            hauteur = 0.5;
+        });
+        bg.on('pointerup', function (pointer) {
+            brush_active = false;
+            console.log("brush_active",brush_active);
+            hauteur = 1;
+        });
+        bg.on('pointermove', function (pointer) {
+            if(brush_active){posX=pointer.x;posY=pointer.y;}
+        });
+
         //setTimeout(()=>{graphics.clear();draw_tabVertex(main_poly);},1000);
     }
     
     update ()
     {
+        pointer0 = this.input.activePointer;
+
         timer++;
         if(timer%(Math.round(60*relaxation_time/1000))==0){convexify(random_poly);}
+
+        if(pointer0.isDown)
+        {
+            for (let index = 0; index < random_poly.length; index++)
+            {
+                let d = Math.pow(Math.pow(random_poly[index][0]-posX,2)+Math.pow(random_poly[index][1]-posY,2),0.5);
+                if (d<radius_brush)
+                {
+                    random_poly[index][0] = posX + radius_brush/d*(random_poly[index][0]-posX);
+                    random_poly[index][1] = posY + radius_brush/d*(random_poly[index][1]-posY);
+                }
+            }
+        }
 
         graphics.clear();
         //draw_tabVertex(main_poly);
         draw_tabVertex(random_poly);
+
+        if (timer%4==0){
+            if(pointer0.isDown){sponge.setScale(0.5);}
+            else {sponge.setScale(1);}
+        sponge.x = posX;
+        sponge.y = posY;}
     }
 }
 
@@ -61,11 +113,11 @@ function draw_tabVertex (tab){
         let y = tab[i][1];
         let point = new Phaser.Geom.Point(x,y);
         tab_vertices.push(point);     
-        graphics.fillStyle(0xFF0000, 1);
-        graphics.fillCircle(x,y,5).setDepth(2);
+        //graphics.fillStyle(0x000000, 1);
+        //graphics.fillCircle(x,y,5).setDepth(2);
     }
     poly.setTo(tab_vertices);
-    graphics.fillStyle(0xFFFFFF, 1);
+    graphics.fillStyle(0x730800, 1);
     graphics.fillPoints(poly.points, true).setDepth(1);
 }
 
@@ -79,16 +131,19 @@ function convexify (tab){
         let angle1 = Phaser.Math.Angle.Between(tab_aux[i][0],tab_aux[i][1],tab_aux[j][0],tab_aux[j][1]);
         let angle2 = Phaser.Math.Angle.Between(tab_aux[i][0],tab_aux[i][1],tab_aux[k][0],tab_aux[k][1]);
         let diff_angle = angle2-angle1<0?angle2-angle1+2*Math.PI:angle2-angle1;
-        if (diff_angle > Math.PI)
+        if (diff_angle > Math.PI - Math.PI/128)
         {
-            for (let index = 1; index <= etapes_convexify; index++) {
+            let alpha = 1;
+            tab[j][0] = (1-alpha)*tab_aux[j][0]+alpha*(tab_aux[i][0]+tab_aux[k][0])/2;
+            tab[j][1] = (1-alpha)*tab_aux[j][1]+alpha*(tab_aux[i][1]+tab_aux[k][1])/2;
+            /*for (let index = 1; index <= etapes_convexify; index++) {
                 let alpha = index/etapes_convexify;
                 alpha = xsin(alpha);
                 setTimeout(()=>{
                     tab[j][0] = (1-alpha)*tab_aux[j][0]+alpha*(tab_aux[i][0]+tab_aux[k][0])/2;
                     tab[j][1] = (1-alpha)*tab_aux[j][1]+alpha*(tab_aux[i][1]+tab_aux[k][1])/2;
                 },index/etapes_convexify*relaxation_time);
-            }
+            }*/
         }        
     }
 }
